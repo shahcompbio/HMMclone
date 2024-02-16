@@ -60,6 +60,7 @@ HMMclone <- function(dat,
                      selftransitionprob = 0.99,
                      maxCN = 15,
                      sd_value = 0.2,
+                     clone_coverage = NULL,
                      usecpp = TRUE,
                      ncores = 1,
                      progressbar = TRUE){
@@ -67,6 +68,27 @@ HMMclone <- function(dat,
   # Make sure dataframe is in chromosome position order
   dat <- data.table::as.data.table(dat) %>%
   .[order(clone_id, chr, start)]
+
+  if (!is.null(clone_coverage)){
+    if ("n_cells" %in% names(clone_coverage)){
+      clone_coverage$sd <- predict(variance_models$model_cells, clone_coverage)
+      sd_clone <- clone_coverage$sd
+      names(sd_clone) <- clone_coverage$clone_id
+    }
+    if ("coverage" %in% names(clone_coverage)){
+      clone_coverage$sd <- predict(variance_models$model_coverage, clone_coverage)
+      sd_clone <- clone_coverage$sd
+      names(sd_clone) <- clone_coverage$clone_id
+    }
+    if (!all(c("coverage", "n_cells") %in% names(clone_coverage))){
+      error("columns with names coverage or n_cells not present in clone_coverage data.frame!")
+    }
+  } else{
+    #if clone_coverage is null assign sd to be the same for each clone
+    clone_names <- unique(dat$clone_id)
+    sd_clone <- rep(sd_value, length(clone_names))
+    names(sd_clone) <- clone_names
+  }
 
   if (!("keep" %in% colnames(dat))){
     dat$keep <- TRUE
@@ -85,7 +107,7 @@ HMMclone <- function(dat,
                                                          function(clone) {
                                                            HMMcloneperchr(dplyr::filter(dat_for_inference, clone_id == clone),
                                                                               selftransitionprob = selftransitionprob,
-                                                                              sd_value = sd_value,
+                                                                              sd_value = sd_clone[[clone]],
                                                                               maxCN = maxCN,
                                                                               usecpp = usecpp
                                                            )
@@ -99,7 +121,7 @@ HMMclone <- function(dat,
       function(clone) {
         HMMcloneperchr(dplyr::filter(dat_for_inference, clone_id == clone),
                        selftransitionprob = selftransitionprob,
-                       sd_value = sd_value,
+                       sd_value = sd_clone[[clone]],
                        maxCN = maxCN,
                        usecpp = usecpp
         )
