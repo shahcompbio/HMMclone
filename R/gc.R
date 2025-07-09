@@ -1,5 +1,37 @@
 # Different way similar to HMMcopy
 # Code adapated from `HMMcopy` package
+#' GC bias correction using HMMcopy approach
+#'
+#' Corrects GC bias in read count data using a two-stage loess regression
+#' approach similar to the HMMcopy package.
+#'
+#' @param counts Numeric vector of read counts
+#' @param gc Numeric vector of GC content values (0-1) corresponding to counts
+#' @param span1 Span parameter for first loess regression (default: 0.03)
+#' @param span2 Span parameter for second loess regression (default: 0.3)
+#' @param valid Logical vector indicating valid bins (currently unused)
+#' @param bin_ids Character vector of bin identifiers (currently unused)
+#'
+#' @return Numeric vector of GC-corrected read counts
+#'
+#' @details
+#' The correction uses a two-stage approach:
+#' 1. Fit initial loess regression of counts vs GC content
+#' 2. Fit second loess regression to smooth the correction curve
+#' 3. Divide original counts by predicted values to get corrected counts
+#'
+#' This approach is adapted from the HMMcopy package methodology.
+#'
+#' @examples
+#' # Generate example data
+#' gc <- runif(1000, 0.3, 0.7)
+#' counts <- rpois(1000, lambda = 100 * (1 + 2 * (gc - 0.5)^2))  # GC bias
+#'
+#' # Apply GC correction
+#' corrected <- gc_cor_hmm(counts, gc)
+#'
+#' @seealso \code{\link{gc_cor_modal}} for modal regression approach
+#'
 #' @export
 gc_cor_hmm <- function(counts, gc, span1 = 0.03, span2 = 0.3, valid = NULL, bin_ids = NULL) {
   counts <- as.vector(counts)
@@ -12,6 +44,57 @@ gc_cor_hmm <- function(counts, gc, span1 = 0.03, span2 = 0.3, valid = NULL, bin_
 
 #R implementation of modal regression GC correction from Matthew Zatzman.
 # See scatools
+#' GC bias correction using modal regression
+#'
+#' Corrects GC bias using modal regression approach with quantile regression
+#' to find the modal relationship between read counts and GC content.
+#'
+#' @param counts Numeric vector of read counts
+#' @param gc Numeric vector of GC content values (0-1) corresponding to counts
+#' @param valid Logical vector indicating which bins to use (default: all TRUE)
+#' @param bin_ids Character vector of bin identifiers (default: sequence numbers)
+#' @param lowess_frac Fraction for lowess smoothing (default: 0.2)
+#' @param n_sample_data Number of data points to sample for quantile regression (default: NULL, use all)
+#' @param degree Degree for spline fitting (default: 4, currently unused)
+#' @param knots Knot positions for spline fitting (default: 0.38, currently unused)
+#' @param q Quantile range for regression c(lower, upper) (default: c(0.1, 0.9))
+#' @param g GC content range for integration c(lower, upper) (default: c(0.1, 0.9))
+#' @param model Model type (default: "poly", currently unused)
+#' @param results Return format: "counts", "default", or "full" (default: "counts")
+#'
+#' @return Depends on \code{results} parameter:
+#' \itemize{
+#'   \item "counts": Numeric vector of GC-corrected read counts
+#'   \item "default": Data frame with correction details (excluding quantile curves)
+#'   \item "full": Complete data frame with all quantile regression results
+#' }
+#'
+#' @details
+#' This method uses quantile regression to model the relationship between read counts
+#' and GC content across multiple quantiles. The modal quantile (representing the
+#' most common relationship) is identified and used for correction.
+#'
+#' The approach:
+#' 1. Fits polynomial quantile regression across multiple quantiles
+#' 2. Integrates under each quantile curve
+#' 3. Finds the modal quantile with minimum distance between adjacent curves
+#' 4. Uses the modal curve for GC bias correction
+#'
+#' This implementation is based on methods from Matthew Zatzman (scatools).
+#'
+#' @examples
+#' # Generate example data with GC bias
+#' gc <- runif(1000, 0.3, 0.7)
+#' counts <- rpois(1000, lambda = 100 * (1 + 2 * (gc - 0.5)^2))
+#'
+#' # Apply modal GC correction
+#' corrected <- gc_cor_modal(counts, gc)
+#'
+#' # Get full results
+#' full_results <- gc_cor_modal(counts, gc, results = "full")
+#'
+#' @seealso \code{\link{gc_cor_hmm}} for HMMcopy-style correction
+#'
 #' @export
 gc_cor_modal <- function(counts,
                          gc,
@@ -129,4 +212,13 @@ gc_cor_modal <- function(counts,
     # only return the corrected counts
     return(as.vector(df_regression$modal_corrected))
   }
+}
+
+# Helper function for gc_cor_modal when insufficient data
+.gc_warn_error <- function(df_regression, quantile_names) {
+  warning("Insufficient data for GC correction. Returning original data with NA for corrected values.")
+  df_regression$modal_quantile <- NA
+  df_regression$modal_curve <- NA
+  df_regression$modal_corrected <- NA
+  return(df_regression)
 }

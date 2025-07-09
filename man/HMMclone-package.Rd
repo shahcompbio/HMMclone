@@ -2,7 +2,6 @@
 % Please edit documentation in R/HMMclone-package.R
 \docType{package}
 \name{HMMclone-package}
-\alias{HMMclone}
 \alias{HMMclone-package}
 \title{HMMclone: What the Package Does (One Line, Title Case)}
 \description{

@@ -1,3 +1,31 @@
+#' Fit Hidden Markov Model for copy number calling
+#'
+#' Fits a Hidden Markov Model to copy number data using the Viterbi algorithm
+#' to find the most likely sequence of copy number states.
+#'
+#' @param copy Numeric vector of copy number values (e.g., GC-corrected read counts)
+#' @param selftransitionprob Probability of staying in the same copy number state (default: 0.99)
+#' @param maxCN Maximum copy number state to consider (default: 15)
+#' @param sd_value Standard deviation for the normal emission model (default: 0.2)
+#' @param usecpp Logical, whether to use C++ implementation of Viterbi algorithm (default: TRUE)
+#'
+#' @return Integer vector of inferred copy number states (0-based indexing)
+#'
+#' @details
+#' The function models copy number states as hidden states in an HMM where:
+#' - States represent integer copy numbers from 0 to maxCN
+#' - Emission probabilities follow a normal distribution centered on the true copy number
+#' - Transition probabilities favor staying in the same state (selftransitionprob)
+#' - The Viterbi algorithm finds the most likely state sequence
+#'
+#' @examples
+#' # Generate some example copy number data
+#' copy_data <- c(rep(2, 50), rep(4, 30), rep(2, 20))
+#' copy_data <- copy_data + rnorm(length(copy_data), 0, 0.2)
+#'
+#' # Fit HMM
+#' states <- fitHMM(copy_data, selftransitionprob = 0.99, maxCN = 6)
+#'
 #' @export
 fitHMM <- function(copy,
                    selftransitionprob = 0.99,
@@ -55,6 +83,55 @@ HMMcloneperchr <- function(dat,
   return(dat)
 }
 
+#' Copy number calling for multiple clones using Hidden Markov Models
+#'
+#' Main function for calling copy number states across multiple clones from
+#' single-cell whole genome sequencing data. Processes each clone and chromosome
+#' separately using Hidden Markov Models.
+#'
+#' @param dat Data frame with columns: clone_id, chr, start, end, copy.
+#'   Additional columns are preserved in output.
+#' @param selftransitionprob Probability of staying in the same copy number state (default: 0.99)
+#' @param maxCN Maximum copy number state to consider (default: 15)
+#' @param sd_value Standard deviation for emission model when clone_coverage is NULL (default: 0.2)
+#' @param clone_coverage Optional data frame with clone-specific parameters.
+#'   Should have columns: clone_id and either 'coverage' or 'n_cells'
+#' @param usecpp Logical, whether to use C++ implementation (default: TRUE)
+#' @param ncores Number of cores for parallel processing (default: 1)
+#' @param progressbar Logical, whether to show progress bar (default: TRUE)
+#'
+#' @return Data frame with original data plus 'state' column containing
+#'   inferred copy number states for each genomic bin
+#'
+#' @details
+#' The function:
+#' 1. Sorts data by clone, chromosome, and position
+#' 2. Applies clone-specific standard deviations if clone_coverage provided
+#' 3. Processes each clone separately (optionally in parallel)
+#' 4. Fits HMM chromosome-wise to avoid unrealistic inter-chromosomal transitions
+#' 5. Fills in states for bins excluded from inference (keep = FALSE)
+#'
+#' If a 'keep' column is present, only bins with keep = TRUE are used for
+#' inference. States for excluded bins are filled based on neighboring states.
+#'
+#' @examples
+#' # Create example data
+#' library(data.table)
+#' dat <- data.frame(
+#'   clone_id = rep("clone1", 100),
+#'   chr = rep("1", 100),
+#'   start = seq(1, 1000000, 10000),
+#'   end = seq(10000, 1000000, 10000),
+#'   copy = c(rep(2, 50), rep(4, 30), rep(2, 20)) + rnorm(100, 0, 0.2)
+#' )
+#'
+#' # Call copy numbers
+#' results <- HMMclone(dat, selftransitionprob = 0.99, maxCN = 6)
+#'
+#' # With clone coverage information
+#' clone_cov <- data.frame(clone_id = "clone1", coverage = 0.5)
+#' results <- HMMclone(dat, clone_coverage = clone_cov)
+#'
 #' @export
 HMMclone <- function(dat,
                      selftransitionprob = 0.99,
