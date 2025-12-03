@@ -39,6 +39,13 @@ devtools::install_github("shahcompbio/HMMclone")
 
 **`count_reads()`** - Count reads per genomic bin from BAM files
 
+**Note:** The `count_reads()` function requires the `HMMrefs` package, which provides reference data (mappability and GC content) for genomic bins. If you plan to use `count_reads()`, install HMMrefs first:
+
+```r
+# Install HMMrefs (required for count_reads function)
+devtools::install_github("marcjwilliams1/HMMrefs")
+```
+
 ```r
 # Count reads in 10kb bins
 read_counts <- count_reads(

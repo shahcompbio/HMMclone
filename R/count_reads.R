@@ -37,8 +37,14 @@ count_reads <- function(bamfile,
                         isNotPassingQualityControls=FALSE,
                         isDuplicate=FALSE){
 
+  # Check if HMMrefs is available
+  if (!requireNamespace("HMMrefs", quietly = TRUE)) {
+    stop("HMMrefs package is required for count_reads() function. ",
+         "Install with: devtools::install_github('marcjwilliams1/HMMrefs')")
+  }
+
   #bamfile <- "/juno/work/shah/users/william1/projects/gbm/pilot/results/bams/P1-1.bam"
-  df <- references[[genome]][[paste0(binsize)]]
+  df <- HMMrefs::references[[genome]][[paste0(binsize)]]
 
   gr <- GenomicRanges::GRanges(seqnames=df$chr,
                 ranges=IRanges::IRanges(start=df$start, end=df$end))
